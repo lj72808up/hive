@@ -250,6 +250,7 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public boolean execute(String sql) throws SQLException {
+    // 真正远端执行 sql 的逻辑
     runAsyncOnServer(sql);
     TGetOperationStatusResp status = waitForOperationToComplete();
 
@@ -309,6 +310,7 @@ public class HiveStatement implements java.sql.Statement {
     execReq.setConfOverlay(sessConf);
     execReq.setQueryTimeout(queryTimeout);
     try {
+      // client 是Thrift的模板编译出来的RPC client，就是执行 CLIService 的 executeStatement 方法
       TExecuteStatementResp execResp = client.ExecuteStatement(execReq);
       Utils.verifySuccessWithInfo(execResp.getStatus());
       stmtHandle = execResp.getOperationHandle();

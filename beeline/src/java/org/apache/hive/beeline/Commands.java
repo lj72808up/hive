@@ -965,6 +965,7 @@ public class Commands {
 
     ClientHook hook = ClientCommandHookFactory.get().getHook(beeLine, sql);
 
+    // 执行 jdbc 去 server 端查询
     try {
       Statement stmnt = null;
       boolean hasResults;
@@ -994,6 +995,7 @@ public class Commands {
                       eventNotifier
                   ));
             }
+            // stmnt 是 HiveStatement
             hasResults = stmnt.execute(sql);
             logThread.interrupt();
             logThread.join(DEFAULT_QUERY_PROGRESS_THREAD_TIMEOUT);
@@ -1202,6 +1204,7 @@ public class Commands {
     for (int i = 0; i < cmdList.size(); i++) {
       String sql = cmdList.get(i).trim();
       if (sql.length() != 0) {
+        // 执行逻辑
         if (!executeInternal(sql, call)) {
           return false;
         }

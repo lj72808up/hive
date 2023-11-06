@@ -391,6 +391,7 @@ public class Driver implements CommandProcessor {
       lDrvState.stateLock.unlock();
     }
 
+    /** 对 sql 进行一些变量替换等 */
     command = new VariableSubstitution(new HiveVariableSource() {
       @Override
       public Map<String, String> getHiveVariable() {
@@ -465,6 +466,9 @@ public class Driver implements CommandProcessor {
       ctx.setHDFSCleanup(true);
 
       perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.PARSE);
+      /** 1） hive 自带的解析 ASTNode，可用于解析 sql 血缘
+       *  Sql -> ASTNode
+       * */
       ASTNode tree = ParseUtils.parse(command, ctx);
       perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.PARSE);
 
@@ -481,6 +485,8 @@ public class Driver implements CommandProcessor {
       }
 
       perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.ANALYZE);
+
+      /** 语法解析器 */
       BaseSemanticAnalyzer sem = SemanticAnalyzerFactory.get(queryState, tree);
       List<HiveSemanticAnalyzerHook> saHooks =
           getHooks(HiveConf.ConfVars.SEMANTIC_ANALYZER_HOOK,
@@ -490,6 +496,7 @@ public class Driver implements CommandProcessor {
       // query running in this same thread.  This has to be done after we get our semantic
       // analyzer (this is when the connection to the metastore is made) but before we analyze,
       // because at that point we need access to the objects.
+      /** 2）刷新 metastore 缓存,要在获取语义解析器对象之后,在该对象解析动作之前 */
       Hive.get().getMSC().flushCache();
 
       // Do semantic analysis and plan generation
@@ -509,6 +516,7 @@ public class Driver implements CommandProcessor {
           hook.postAnalyze(hookCtx, sem.getAllRootTasks());
         }
       } else {
+        /** 3）语法解析并生成执行计划 */
         sem.analyze(tree, ctx);
       }
       // Record any ACID compliant FileSinkOperators we saw so we can add our transaction ID to
@@ -528,6 +536,7 @@ public class Driver implements CommandProcessor {
 
       // get the output schema
       schema = getSchema(sem, conf);
+      /** 获取执行计划 QueryPlan */
       plan = new QueryPlan(queryStr, sem, perfLogger.getStartTime(PerfLogger.DRIVER_RUN), queryId,
         queryState.getHiveOperation(), schema);
 
@@ -537,11 +546,12 @@ public class Driver implements CommandProcessor {
       conf.set("mapreduce.workflow.name", queryStr);
 
       // initialize FetchTask right here
+      /** 4）对执行计划中需要拉去数据的部分进行初始化 */
       if (plan.getFetchTask() != null) {
         plan.getFetchTask().initialize(queryState, plan, null, ctx.getOpContext());
       }
-
       //do the authorization check
+      /** 权限认证 */
       if (!sem.skipAuthorization() &&
           HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_AUTHORIZATION_ENABLED)) {
 
@@ -578,6 +588,7 @@ public class Driver implements CommandProcessor {
       }
 
       compileError = true;
+      /** 5）catch 块中处理整个编译过程中的编译异常 */
       ErrorMsg error = ErrorMsg.getErrorMsg(e.getMessage());
       errorMessage = "FAILED: " + e.getClass().getSimpleName();
       if (error != ErrorMsg.GENERIC_ERROR) {
@@ -616,7 +627,7 @@ public class Driver implements CommandProcessor {
       } catch (Exception e) {
         LOG.warn("Failed when invoking query after-compilation hook.", e);
       }
-
+      /** 编译结束后，计算耗时等辅助操作 */
       double duration = perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.COMPILE)/1000.00;
       ImmutableMap<String, Long> compileHMSTimings = dumpMetaCallTimingWithoutEx("compilation");
       queryDisplay.setHmsTimings(QueryDisplay.Phase.COMPILATION, compileHMSTimings);
@@ -1404,6 +1415,9 @@ public class Driver implements CommandProcessor {
     return compileLock;
   }
 
+  /**
+   * 该方法涉及了整个Hive SQL执行流程，从SQL到编译，解析，执行，收集返回结果。
+   */
   private CommandProcessorResponse runInternal(String command, boolean alreadyCompiled)
       throws CommandNeedRetryException {
     errorMessage = null;
@@ -1454,6 +1468,7 @@ public class Driver implements CommandProcessor {
       int ret;
       if (!alreadyCompiled) {
         // compile internal will automatically reset the perf logger
+        /** 1) 解析sql语法树，ASTNode */
         ret = compileInternal(command, true);
         // then we continue to use this perf logger
         perfLogger = SessionState.getPerfLogger();
@@ -1549,6 +1564,7 @@ public class Driver implements CommandProcessor {
       queryDisplay.setPerfLogEnds(QueryDisplay.Phase.EXECUTION, perfLogger.getEndTimes());
 
       // Take all the driver run hooks and post-execute them.
+      // 执行配置的PostHook
       try {
         for (HiveDriverRunHook driverRunHook : driverRunHooks) {
             driverRunHook.postDriverRun(hookContext);
@@ -1938,6 +1954,9 @@ public class Driver implements CommandProcessor {
 
       hookContext.setHookType(HookContext.HookType.POST_EXEC_HOOK);
       // Get all the post execution hooks and execute them.
+      /**
+       * atlas 血缘就在这里
+       */
       for (Hook peh : getHooks(HiveConf.ConfVars.POSTEXECHOOKS)) {
         if (peh instanceof ExecuteWithHookContext) {
           perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.POST_HOOK + peh.getClass().getName());

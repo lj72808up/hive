@@ -80,6 +80,7 @@ public class CLIService extends CompositeService implements ICLIService {
   @Override
   public synchronized void init(HiveConf hiveConf) {
     this.hiveConf = hiveConf;
+    // CLIService 内部开启一个 SessionManager
     sessionManager = new SessionManager(hiveServer2);
     defaultFetchRows = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_RESULTSET_DEFAULT_FETCH_SIZE);
     addService(sessionManager);

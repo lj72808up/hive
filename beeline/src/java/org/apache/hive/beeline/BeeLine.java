@@ -1030,6 +1030,7 @@ public class BeeLine implements Closeable {
     } catch (Exception e) {
       // ignore
     }
+    // 如下是 beeline 远程调用
     return execute(reader, false);
   }
 
@@ -1175,6 +1176,7 @@ public class BeeLine implements Closeable {
           line = line.trim();
         }
 
+        // dispatch(line) 执行命令或 sql
         if (!dispatch(line)) {
           lastExecutionResult = ERRNO_OTHER;
           if (exitOnError) break;
@@ -1306,11 +1308,13 @@ public class BeeLine implements Closeable {
       line = "!help";
     }
 
+    // isBeeLine标记运行为beeline模式还是兼容模式
     if (isBeeLine) {
       if (line.startsWith(COMMAND_PREFIX)) {
         // handle SQLLine command in beeline which starts with ! and does not end with ;
         return execCommandWithPrefix(line);
       } else {
+        // sql 语句执行
         return commands.sql(line, getOpts().getEntireLineAsCommand());
       }
     } else {

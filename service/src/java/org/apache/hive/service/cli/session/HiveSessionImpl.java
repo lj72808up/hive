@@ -527,6 +527,7 @@ public class HiveSessionImpl implements HiveSession {
       operation = getOperationManager().newExecuteStatementOperation(getSession(), statement,
           confOverlay, runAsync, queryTimeout);
       opHandle = operation.getHandle();
+      // 开始执行 sql
       operation.run();
       addOpHandle(opHandle);
       return opHandle;

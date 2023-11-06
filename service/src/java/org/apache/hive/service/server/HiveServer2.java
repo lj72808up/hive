@@ -124,6 +124,7 @@ public class HiveServer2 extends CompositeService {
       LOG.warn("Could not initiate the HiveServer2 Metrics system.  Metrics may not be reported.", t);
     }
 
+    // 加入 CLIService
     cliService = new CLIService(this);
     addService(cliService);
     final HiveServer2 hiveServer2 = this;
@@ -136,8 +137,9 @@ public class HiveServer2 extends CompositeService {
     if (isHTTPTransportMode(hiveConf)) {
       thriftCLIService = new ThriftHttpCLIService(cliService, oomHook);
     } else {
-      thriftCLIService = new ThriftBinaryCLIService(cliService, oomHook);
+      thriftCLIService = new ThriftBinaryCLIService(cliService, oomHook);  // 默认是 ThriftBinaryCLIService
     }
+    // 加入 ThriftCliServer
     addService(thriftCLIService);
     super.init(hiveConf);
     // Set host name in hiveConf
@@ -169,6 +171,7 @@ public class HiveServer2 extends CompositeService {
       throw new RuntimeException("Failed to get metastore connection", e);
     }
     // Setup web UI
+    /** 启动 webui */
     try {
       int webUIPort =
           hiveConf.getIntVar(ConfVars.HIVE_SERVER2_WEBUI_PORT);
@@ -490,10 +493,12 @@ public class HiveServer2 extends CompositeService {
 
   @Override
   public synchronized void start() {
+    // 负责启动 CLIService 和 ThriftHttpCLIService 服务
     super.start();
     // If we're supporting dynamic service discovery, we'll add the service uri for this
     // HiveServer2 instance to Zookeeper as a znode.
     HiveConf hiveConf = this.getHiveConf();
+    // 判断，如果支持动态服务发现，则将此HiveServer2实例的服务 uri 做为 znode 添加到 Zookeeper
     if (hiveConf.getBoolVar(ConfVars.HIVE_SERVER2_SUPPORT_DYNAMIC_SERVICE_DISCOVERY)) {
       try {
         addServerInstanceToZooKeeper(hiveConf);
@@ -604,6 +609,7 @@ public class HiveServer2 extends CompositeService {
         scheduleClearDanglingScratchDir(hiveConf, new Random().nextInt(600));
 
         server = new HiveServer2();
+        // init() 建立CLIService实例 和 ThriftHttpCLIService实例
         server.init(hiveConf);
         server.start();
 
@@ -709,6 +715,7 @@ public class HiveServer2 extends CompositeService {
     HiveConf.setLoadHiveServer2Config(true);
     try {
       ServerOptionsProcessor oproc = new ServerOptionsProcessor("hiveserver2");
+      // 改句最后返回  new ServerOptionsProcessorResponse(new StartOptionExecutor());
       ServerOptionsProcessorResponse oprocResponse = oproc.parse(args);
 
       // NOTE: It is critical to do this here so that log4j is reinitialized
@@ -721,6 +728,7 @@ public class HiveServer2 extends CompositeService {
       LOG.debug(oproc.getDebugMessage().toString());
 
       // Call the executor which will execute the appropriate command based on the parsed options
+      // 这里其实是上面 oprpc.parse() 里构建的 new StartOptionExecutor().execute()
       oprocResponse.getServerOptionsExecutor().execute();
     } catch (LogInitializationException e) {
       LOG.error("Error initializing log: " + e.getMessage(), e);
