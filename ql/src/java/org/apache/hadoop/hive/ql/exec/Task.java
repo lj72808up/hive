@@ -196,6 +196,8 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
       if (ss != null) {
         ss.getHiveHistory().logPlanProgress(queryPlan);
       }
+      //todo 该 execut() 方法是抽象方法, 由 task 类型决定
+      // 可以用 MapRedTask 作为例子看
       int retval = execute(driverContext);
       this.setDone();
       if (ss != null) {

@@ -569,7 +569,7 @@ public class Driver implements CommandProcessor {
         }
       }
 
-      if (conf.getBoolVar(ConfVars.HIVE_LOG_EXPLAIN_OUTPUT)) {
+      if (conf.getBoolVar(ConfVars.HIVE_LOGex_EXPLAIN_OUTPUT)) {
         String explainOutput = getExplainOutput(sem, plan, tree);
         if (explainOutput != null) {
           if (conf.getBoolVar(ConfVars.HIVE_LOG_EXPLAIN_OUTPUT)) {
@@ -1538,6 +1538,7 @@ public class Driver implements CommandProcessor {
           return rollback(createProcessorResponse(ret));
         }
       }
+      /** 2) 把上面解析出来的 plan 提交成任务 */
       ret = execute(true);
       if (ret != 0) {
         //if needRequireLock is false, the release here will do nothing because there is no lock
@@ -1812,6 +1813,7 @@ public class Driver implements CommandProcessor {
             String.valueOf(jobs));
         SessionState.get().getHiveHistory().setIdToTableMap(plan.getIdToTableNameMap());
       }
+      //todo 初始化 job 名称
       String jobname = Utilities.abbreviate(queryStr, maxlen - 6);
 
       // A runtime that launches runnable tasks as separate Threads through
@@ -1823,6 +1825,7 @@ public class Driver implements CommandProcessor {
       if (isInterrupted()) {
         return handleInterruption("before running tasks.");
       }
+      //todo 创建 DriverContext, 里面维护了等待执行的任务(runnable)和执行中(running)的任务2个队列
       DriverContext driverCxt = new DriverContext(ctx);
       driverCxt.prepare(plan);
 
@@ -1838,6 +1841,7 @@ public class Driver implements CommandProcessor {
         // This should never happen, if it does, it's a bug with the potential to produce
         // incorrect results.
         assert tsk.getParentTasks() == null || tsk.getParentTasks().isEmpty();
+        //todo 把task加到 runnable 队列中
         driverCxt.addToRunnable(tsk);
 
         if (metrics != null) {
@@ -1847,11 +1851,14 @@ public class Driver implements CommandProcessor {
 
       perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.RUN_TASKS);
       // Loop while you either have tasks running, or tasks queued up
+      /** 开始提交任务 */
+      //todo 只要 context 中 running 和 runnable 队列不空,就会一直循环
       while (driverCxt.isRunning()) {
 
         // Launch upto maxthreads tasks
         Task<? extends Serializable> task;
         while ((task = driverCxt.getRunnable(maxthreads)) != null) {
+          //todo 向 yarn 提交任务
           TaskRunner runner = launchTask(task, queryId, noName, jobname, jobs, driverCxt);
           if (!runner.isRunning()) {
             break;
@@ -2199,6 +2206,7 @@ public class Driver implements CommandProcessor {
       if (LOG.isInfoEnabled()){
         LOG.info("Starting task [" + tsk + "] in serial mode");
       }
+      //todo 核心执行方法
       tskRun.runSequential();
     }
     return tskRun;

@@ -84,6 +84,9 @@ public class MapRedTask extends ExecDriver implements Serializable {
   }
 
   @Override
+  /**
+   * 执行 map reduce 任务
+   */
   public int execute(DriverContext driverContext) {
 
     Context ctx = driverContext.getCtx();
@@ -96,6 +99,7 @@ public class MapRedTask extends ExecDriver implements Serializable {
       }
 
       // estimate number of reducers
+      //todo 设置 reduce 个数
       setNumberOfReducers();
 
       // auto-determine local mode if allowed

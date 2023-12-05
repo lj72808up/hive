@@ -73,17 +73,18 @@ private void runAsyncOnServer(String sql) throws SQLException {
 
 #### 2. HiveServer2 启动及远程调用
 => HiveServer2 启动了两种线程：` CLIService` 和 `ThriftCLIService`     
-=>`ThriftCLIService`启动时，会将`CLIService`的实例也传给它。这样，`ThriftCLIService`收到请求后，就可以委托给`CLIService`处理
-=> `CLIService` 主要封装了处理命令的逻辑，一条命令发到`HiveServer2`后，`ThriftCLIService`会委托给`CLIService`来处理。不同的命令会调用不同的`CLIService`方法。
-    比如执行Sql就是调用`CliService#executeStatement()`方法。
-=> `CliService#executeStatement()` 会把任务委托给内部的 HiveSession 执行 `HiveSession#executeStatement`
-    关于SessionHandle和OperationHandle
+=>`ThriftCLIService`启动时，会将`CLIService`的实例也传给它。这样，`ThriftCLIService`收到请求后，就可以委托给`CLIService`处理    
+=> `CLIService` 主要封装了处理命令的逻辑，一条命令发到`HiveServer2`后，`ThriftCLIService`会委托给`CLIService`来处理。不同的命令会调用不同的`CLIService`方法。     
+    比如执行Sql就是调用`CliService#executeStatement()`方法。     
+=> `CliService#executeStatement()` 会把任务委托给内部的 HiveSession 执行 `HiveSession#executeStatement`       
+    关于SessionHandle和OperationHandle            
     在hive中，一个session表示一个会话。我们可以理解为一个beeline控制台就是一个session，在我们通过!conn命令连接到集群后，HiveServer2就会创建一个HiveSession，然后交给SessionManager管理，之后返回一个SessionHandle给客户端，这个SessionHandle就是此次session的唯一标识了。后面客户端发送命令的时候都需要带上这个SessionHandle，这样HiveServer2才可以辨认出是哪个session发来的请求。
     在一个session中发起一个请求，HiveServer2收到请求进行处理后，会返回一个OperationHandle来作为此次操作的唯一标识。后面客户端可以通过这个OperationHandle标识来获取此次操作的具体信息（发请求时带上这个OperationHandle信息），比如获取操作的执行状态、日志等信息。
     这也就是说，一个session其实可以发起多个操作，只要维护好返回的OperationHandle，我们可以并行查询这些操作的相关状态。在beeline的控制台中，我们发送完一个命令后，会阻塞在那里，给我们的感觉好像一个session只能同时处理一个命令。
-    另外，在阻塞的过程中，beeline客户端其实也不断的再想HiveServer2发送请求获取日志并输出。
-=> HiveSession 再委托 `SqlOperation#runInternal()` => 最终调用 `Driver#run()`
+    另外，在阻塞的过程中，beeline客户端其实也不断的再想HiveServer2发送请求获取日志并输出。                
+=> HiveSession 再委托 `SqlOperation#runInternal()` => 最终调用 `Driver#run()`                    
     该方法里包括执行 preHook，compile，执行postHook
 
-=> 如何提交 mapreduce 任务呢？
+=> 如何提交 mapreduce 任务呢？                    
+    `Driver#runInternal()` 涉及了整个Hive SQL执行流程，从SQL到编译，解析，执行，收集返回结果。
 https://blog.csdn.net/zyzzxycj/article/details/102861166
